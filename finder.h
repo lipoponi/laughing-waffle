@@ -8,7 +8,11 @@
 #include <queue>
 #include <thread>
 #include <vector>
+#include <QDir>
+#include <QDirIterator>
+#include <QFile>
 #include <QObject>
+#include <QTextStream>
 
 class finder : public QObject
 {
@@ -16,8 +20,8 @@ class finder : public QObject
 public:
     struct result_t
     {
-        bool first;
-        int progress;
+        bool first = true;
+        int progress = 0;
         QStringList items;
     };
 
@@ -42,7 +46,9 @@ public:
 
 private:
     void crawl(QString directory);
+    void enque_file_to_scan(QString file_path);
     void scan(QString file_path, QString text, std::atomic<bool> &cancel);
+    void queue_callback();
 
 signals:
     void result_changed();
@@ -50,6 +56,9 @@ signals:
 public slots:
     void set_directory(QString directory);
     void set_text_to_search(QString text);
+
+private slots:
+    void callback();
 
 private:
     static const int scan_threads_count = 4;
@@ -59,6 +68,7 @@ private:
     std::priority_queue<QString, std::vector<QString>, file_size_cmp> file_queue;
     bool quit;
     std::atomic<bool> cancel;
+    std::atomic<bool> callback_queued;
 
     mutable std::mutex params_m;
     mutable std::mutex queue_m;
