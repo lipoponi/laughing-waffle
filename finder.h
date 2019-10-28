@@ -49,6 +49,9 @@ private:
     void enque_file_to_scan(QString file_path);
     void scan(QString file_path, QString text, std::atomic<bool> &cancel);
     void queue_callback();
+    void increase_files_count(uint cnt);
+    void increase_scanned_count();
+    int get_percentage(unsigned long long c, unsigned long long all);
 
 signals:
     void result_changed();
@@ -63,6 +66,8 @@ private slots:
 private:
     static const int scan_threads_count = 4;
 
+    std::atomic<unsigned long long> file_count;
+    std::atomic<unsigned long long> scanned_count;
     params_t params;
     result_t result;
     std::priority_queue<QString, std::vector<QString>, file_size_cmp> file_queue;

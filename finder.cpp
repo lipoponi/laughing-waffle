@@ -6,7 +6,9 @@ bool finder::file_size_cmp::operator()(const QString &lhs, const QString &rhs)
 }
 
 finder::finder()
-    : quit(false)
+    : file_count(0)
+    , scanned_count(0)
+    , quit(false)
     , cancel(false)
     , callback_queued(false)
     , crawl_thread([this]
@@ -32,6 +34,9 @@ finder::finder()
             result.items.clear();
             queue_callback();
         }
+
+        file_count = 0;
+        scanned_count = 0;
 
         if (quit)
             return;
@@ -87,6 +92,7 @@ finder::~finder()
         std::lock_guard<std::mutex> params_lg(params_m);
         quit = true;
         crawler_has_work_cv.notify_all();
+        scanner_has_work_cv.notify_all();
     }
     crawl_thread.join();
     for (int i = 0; i < scan_threads.size(); i++)
@@ -133,6 +139,9 @@ void finder::crawl(QString directory)
         current.setFilter(QDir::Files | QDir::Hidden | QDir::NoSymLinks);
 
         auto files = current.entryInfoList();
+        auto cnt = current.count();
+        file_count += cnt;
+        queue_callback();
 
         for (auto file : files)
         {
@@ -158,7 +167,7 @@ void finder::scan(QString file_path, QString text, std::atomic<bool> &cancel)
     while (!in.atEnd())
     {
         if (cancel.load())
-            return;
+            break;
 
         QString buffer = std::move(block);
         block = in.read(blockSize);
@@ -167,21 +176,29 @@ void finder::scan(QString file_path, QString text, std::atomic<bool> &cancel)
         {
             std::lock_guard<std::mutex> result_lg(result_m);
             if (cancel.load())
-                return;
+                break;
 
             result.items.push_back(file_path);
             queue_callback();
-            return;
+            break;
         }
     }
+
+    scanned_count++;
+    queue_callback();
 }
 
 finder::result_t finder::get_result()
 {
     std::lock_guard<std::mutex> result_lg(result_m);
+
+    unsigned long long all_cnt = file_count.load();
+    unsigned long long done_cnt = scanned_count.load();
+
     result_t tmp = result;
     result.first = false;
     result.items.clear();
+    tmp.progress = all_cnt == 0 ? 0 : done_cnt *100 / all_cnt;
     return tmp;
 }
 
