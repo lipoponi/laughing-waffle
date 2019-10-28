@@ -1,39 +1,7 @@
 #include "finder.h"
 
-finder::scan_thread_t::scan_thread_t(finder *parent)
-    : cancel(false)
-    , thread([this, parent]
-{
-    for (;;)
-    {
-        std::unique_lock<std::mutex> queue_lg(parent->queue_m);
-        parent->scanner_has_work_cv.wait(queue_lg, [this, parent]
-        {
-            return !parent->file_queue.empty() || parent->quit;
-        });
-
-        if (parent->quit)
-            return;
-
-        QString file_path = file_queue.top();
-        QString text;
-        file_queue.pop();
-        cancel.store(false);
-        queue_lg.unlock();
-
-        {
-            std::lock_guard<std::mutex> params_lg(parent->params_m);
-            text = parent->params.text_to_search;
-        }
-
-        parent->scan(file_path, text, cancel);
-    }
-})
-{}
-
 finder::finder()
-    : scan_threads(finder::scan_threads_count, scan_thread_t(this))
-    , crawl_thread([this]
+    : crawl_thread([this]
 {
     for (;;)
     {
@@ -46,8 +14,8 @@ finder::finder()
         {
             std::lock_guard<std::mutex> queue_lg(queue_m);
             file_queue = decltype(file_queue)();
-            for (scan_thread_t &current : scan_threads)
-                current.cancel.store(true);
+            for (auto &current : scan_cancel)
+                current.store(true);
         }
 
         {
@@ -70,4 +38,51 @@ finder::finder()
         crawl(dir);
     }
 })
-{}
+{
+    for (int i = 0; i != scan_threads.size(); i++)
+    {
+        scan_threads.emplace_back([this, i]
+        {
+            for (;;)
+            {
+                std::unique_lock<std::mutex> queue_lg(queue_m);
+                scanner_has_work_cv.wait(queue_lg, [this]
+                {
+                    return !file_queue.empty() || quit;
+                });
+
+                if (quit)
+                    return;
+
+                QString file_path = file_queue.top();
+                QString text;
+                file_queue.pop();
+                scan_cancel[i].store(false);
+                queue_lg.unlock();
+
+                {
+                    std::lock_guard<std::mutex> params_lg(params_m);
+                    text = params.text_to_search;
+                }
+
+                scan(file_path, text, scan_cancel[i]);
+            }
+        });
+    }
+}
+
+void finder::set_directory(QString directory)
+{
+    std::lock_guard<std::mutex> params_lg(params_m);
+    params.done = false;
+    params.directory = directory;
+    params.invalid = params.directory.isEmpty() || params.text_to_search.isEmpty();
+}
+
+void finder::set_text_to_search(QString text)
+{
+    std::lock_guard<std::mutex> params_lg(params_m);
+    params.done = false;
+    params.text_to_search = text;
+    params.invalid = params.directory.isEmpty() || params.text_to_search.isEmpty();
+}

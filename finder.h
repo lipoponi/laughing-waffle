@@ -1,15 +1,26 @@
 #ifndef FINDER_H
 #define FINDER_H
 
+#include <array>
 #include <atomic>
 #include <condition_variable>
 #include <mutex>
+#include <queue>
 #include <thread>
+#include <vector>
 #include <QObject>
 
 class finder : public QObject
 {
     Q_OBJECT
+public:
+    struct result_t
+    {
+        bool first;
+        int progress;
+        QStringList items;
+    };
+
 private:
     struct params_t
     {
@@ -19,34 +30,45 @@ private:
         QString text_to_search;
     };
 
-    friend struct scan_thread_t
+    struct file_size_cmp
     {
-        scan_thread_t();
-        scan_thread_t(void(*fun)(scan_thread_t *obj));
-
-        std::atomic<bool> cancel;
-        std::thread thread;
+        bool operator()(const QString &lhs, const QString &rhs);
     };
 
 public:
     finder();
-
-signals:
-
-public slots:
+    ~finder();
+    result_t get_result();
 
 private:
-    static int scan_threads_count = 4;
+    void crawl(QString directory);
+    void scan(QString file_path, QString text, std::atomic<bool> &cancel);
+
+signals:
+    void result_changed();
+
+public slots:
+    void set_directory(QString directory);
+    void set_text_to_search(QString text);
+
+private:
+    static const int scan_threads_count = 4;
 
     params_t params;
+    result_t result;
+    std::priority_queue<QString, std::vector<QString>, file_size_cmp> file_queue;
     bool quit;
+    std::atomic<bool> cancel;
 
-    std::mutex params_m;
-    std::mutex queue_m;
+    mutable std::mutex params_m;
+    mutable std::mutex queue_m;
+    mutable std::mutex result_m;
     std::condition_variable crawler_has_work_cv;
+    std::condition_variable scanner_has_work_cv;
 
-    std::vector<scan_thread_t> scan_threads;
     std::thread crawl_thread;
+    std::vector<std::thread> scan_threads;
+    std::array<std::atomic<bool>, finder::scan_threads_count> scan_cancel;
 };
 
 #endif // FINDER_H
