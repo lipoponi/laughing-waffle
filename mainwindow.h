@@ -3,6 +3,8 @@
 
 #include <QMainWindow>
 
+#include "finder.h"
+
 namespace Ui {
 class MainWindow;
 }
@@ -17,6 +19,7 @@ public:
 
 private:
     Ui::MainWindow *ui;
+    finder bg_finder;
 };
 
 #endif // MAINWINDOW_H
