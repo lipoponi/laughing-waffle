@@ -7,6 +7,13 @@ MainWindow::MainWindow(QWidget *parent) :
 {
     ui->setupUi(this);
 
+    connect(ui->lineEdit_directory, &QLineEdit::textChanged, this, [this](QString value){
+        QDir current(value);
+        QString color = current.exists() ? "green" : "red";
+
+        ui->lineEdit_directory->setStyleSheet("color: " + color);
+    });
+
     connect(ui->lineEdit_directory, &QLineEdit::textChanged, &bg_finder, &finder::set_directory);
     connect(ui->lineEdit_text_to_search, &QLineEdit::textChanged, &bg_finder, &finder::set_text_to_search);
 
