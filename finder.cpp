@@ -95,7 +95,7 @@ finder::~finder()
         scanner_has_work_cv.notify_all();
     }
     crawl_thread.join();
-    for (int i = 0; i < scan_threads.size(); i++)
+    for (int i = 0; i != scan_threads.size(); i++)
     {
         scan_threads[i].join();
     }
@@ -162,7 +162,6 @@ void finder::scan(QString file_path, QString text, std::atomic<bool> &cancel)
 
     QTextStream in(&file_obj);
     QString block;
-    const int blockSize = 16384;
 
     while (!in.atEnd())
     {
@@ -170,7 +169,7 @@ void finder::scan(QString file_path, QString text, std::atomic<bool> &cancel)
             break;
 
         QString buffer = std::move(block);
-        block = in.read(blockSize);
+        block = in.read(finder::reading_block_size);
         buffer.append(block);
         if (buffer.contains(text))
         {

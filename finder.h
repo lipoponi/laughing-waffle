@@ -65,6 +65,7 @@ private slots:
 
 private:
     static const int scan_threads_count = 4;
+    static const int reading_block_size = 4096;
 
     std::atomic<unsigned long long> file_count;
     std::atomic<unsigned long long> scanned_count;
