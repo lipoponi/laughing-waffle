@@ -59,6 +59,7 @@ signals:
 public slots:
     void set_directory(QString directory);
     void set_text_to_search(QString text);
+    void stop();
 
 private slots:
     void callback();
@@ -67,8 +68,8 @@ private:
     static const int scan_threads_count = 4;
     static const int reading_block_size = 4096;
 
-    std::atomic<unsigned long long> file_count;
-    std::atomic<unsigned long long> scanned_count;
+    std::atomic<unsigned long long> total_size;
+    std::atomic<unsigned long long> scanned_size;
     params_t params;
     result_t result;
     std::priority_queue<QString, std::vector<QString>, file_size_cmp> file_queue;

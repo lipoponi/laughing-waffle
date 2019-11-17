@@ -6,8 +6,8 @@ bool finder::file_size_cmp::operator()(const QString &lhs, const QString &rhs)
 }
 
 finder::finder()
-    : file_count(0)
-    , scanned_count(0)
+    : total_size(0)
+    , scanned_size(0)
     , quit(false)
     , cancel(false)
     , callback_queued(false)
@@ -35,8 +35,8 @@ finder::finder()
             queue_callback();
         }
 
-        file_count = 0;
-        scanned_count = 0;
+        total_size = 0;
+        scanned_size = 0;
 
         if (quit)
             return;
@@ -95,7 +95,7 @@ finder::~finder()
         scanner_has_work_cv.notify_all();
     }
     crawl_thread.join();
-    for (int i = 0; i != scan_threads.size(); i++)
+    for (size_t i = 0; i != scan_threads.size(); i++)
     {
         scan_threads[i].join();
     }
@@ -123,6 +123,17 @@ void finder::set_text_to_search(QString text)
     crawler_has_work_cv.notify_all();
 }
 
+void finder::stop() {
+    std::lock_guard<std::mutex> lg(queue_m);
+
+    cancel.store(true);
+    for (size_t i = 0; i < scan_cancel.size(); i++) {
+        scan_cancel[i].store(true);
+    }
+
+    file_queue = decltype(file_queue)();
+}
+
 void finder::crawl(QString directory)
 {
     QDirIterator dir_it(directory,
@@ -139,9 +150,6 @@ void finder::crawl(QString directory)
         current.setFilter(QDir::Files | QDir::Hidden | QDir::NoSymLinks);
 
         auto files = current.entryInfoList();
-        auto cnt = current.count();
-        file_count += cnt;
-        queue_callback();
 
         for (auto file : files)
         {
@@ -149,7 +157,10 @@ void finder::crawl(QString directory)
                 return;
 
             enque_file_to_scan(file.absoluteFilePath());
+            total_size += file.size();
         }
+
+        queue_callback();
     }
     while (dir_it.hasNext() && (current = QDir(dir_it.next())).exists());
 }
@@ -183,7 +194,7 @@ void finder::scan(QString file_path, QString text, std::atomic<bool> &cancel)
         }
     }
 
-    scanned_count++;
+    scanned_size += QFile(file_path).size();
     queue_callback();
 }
 
@@ -191,8 +202,8 @@ finder::result_t finder::get_result()
 {
     std::lock_guard<std::mutex> result_lg(result_m);
 
-    unsigned long long all_cnt = file_count.load();
-    unsigned long long done_cnt = scanned_count.load();
+    unsigned long long all_cnt = total_size.load();
+    unsigned long long done_cnt = scanned_size.load();
 
     result_t tmp = result;
     result.first = false;

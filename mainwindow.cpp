@@ -3,7 +3,8 @@
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
-    ui(new Ui::MainWindow)
+    ui(new Ui::MainWindow),
+    timer(this)
 {
     ui->setupUi(this);
 
@@ -17,7 +18,7 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(ui->lineEdit_directory, &QLineEdit::textChanged, &bg_finder, &finder::set_directory);
     connect(ui->lineEdit_text_to_search, &QLineEdit::textChanged, &bg_finder, &finder::set_text_to_search);
 
-    connect(&bg_finder, &finder::result_changed, this, [this]
+    connect(&timer, &QTimer::timeout, this, [this]
     {
         auto result = bg_finder.get_result();
 
@@ -26,6 +27,21 @@ MainWindow::MainWindow(QWidget *parent) :
 
         ui->listWidget_result->addItems(result.items);
         ui->progressBar->setValue(result.progress);
+    });
+    timer.start(100);
+
+    connect(ui->pushButton_browse, &QPushButton::clicked, this, [this]{
+        QFileDialog dialog(this);
+        dialog.setFileMode(QFileDialog::DirectoryOnly);
+        dialog.setDirectory(QDir::rootPath());
+
+        if (dialog.exec()) {
+            ui->lineEdit_directory->setText(dialog.selectedFiles().first());
+        }
+    });
+
+    connect(ui->pushButton_stop, &QPushButton::clicked, this, [this]{
+        bg_finder.stop();
     });
 }
 
