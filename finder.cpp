@@ -156,6 +156,9 @@ void finder::crawl(QString directory)
             if (cancel.load())
                 return;
 
+            if (!file.permission(QFile::ReadUser))
+                continue;
+
             enque_file_to_scan(file.absoluteFilePath());
             total_size += file.size();
         }
