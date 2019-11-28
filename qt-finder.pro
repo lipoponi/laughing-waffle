@@ -1,6 +1,6 @@
 #-------------------------------------------------
 #
-# Project created by QtCreator 2019-10-27T22:50:04
+# Project created by QtCreator 2019-11-28T17:18:23
 #
 #-------------------------------------------------
 
@@ -26,11 +26,15 @@ DEFINES += QT_DEPRECATED_WARNINGS
 SOURCES += \
         main.cpp \
         mainwindow.cpp \
-    finder.cpp
+    finder.cpp \
+    helpers.cpp \
+    automaton.cpp
 
 HEADERS += \
         mainwindow.h \
-    finder.h
+    finder.h \
+    helpers.h \
+    automaton.h
 
 FORMS += \
         mainwindow.ui

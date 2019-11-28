@@ -1,239 +1,270 @@
 #include "finder.h"
 
-bool finder::file_size_cmp::operator()(const QString &lhs, const QString &rhs)
+Finder::EntryList::EntryList()
+    : first(true)
+{}
+
+Finder::Params::Params()
+    : invalid(true)
+    , done(true)
+{}
+
+bool Finder::FileSizeCmp::operator()(const QString &lhs, const QString &rhs)
 {
     return QFile(rhs).size() < QFile(lhs).size();
 }
 
-finder::finder()
-    : total_size(0)
-    , scanned_size(0)
+Finder::Finder()
+    : QObject(nullptr)
+    , entryCount(0)
+    , statusCode(0)
+    , scannedCount(0)
+    , scannedSize(0)
+    , totalCount(0)
+    , totalSize(0)
+    , crawlFinished(false)
     , quit(false)
     , cancel(false)
-    , callback_queued(false)
-    , crawl_thread([this]
+    , crawlThread([this]
 {
-    for (;;)
-    {
-        std::unique_lock<std::mutex> params_lg(params_m);
-        crawler_has_work_cv.wait(params_lg, [this]
+    for (;;) {
+        std::unique_lock<std::mutex> paramsLg(paramsM);
+        crawlerHasWorkCv.wait(paramsLg, [this]
         {
             return !params.done || quit;
         });
 
         {
-            std::lock_guard<std::mutex> queue_lg(queue_m);
-            file_queue = decltype(file_queue)();
-            for (auto &current : scan_cancel)
+            std::lock_guard<std::mutex> queueLg(queueM);
+            fileQueue = FileQueue();
+            queuedPattern = params.pattern;
+            for (auto &current : scanCancel) {
                 current.store(true);
+            }
         }
 
         {
-            std::lock_guard<std::mutex> result_lg(result_m);
+            std::lock_guard<std::mutex> resultLg(resultM);
             result.first = true;
-            result.items.clear();
-            queue_callback();
+            result.list.clear();
         }
 
-        total_size = 0;
-        scanned_size = 0;
-
-        if (quit)
+        if (quit) {
             return;
+        }
 
         params.done = true;
-        if (params.invalid)
+        if (params.invalid) {
             continue;
+        }
+
+        cancel.store(false);
+        entryCount.store(0);
+        statusCode.store(1);
+        scannedCount.store(0);
+        scannedSize.store(0);
+        totalCount.store(0);
+        totalSize.store(0);
+        crawlFinished.store(false);
 
         QString dir = params.directory;
-        cancel.store(false);
-        params_lg.unlock();
+        paramsLg.unlock();
 
         crawl(dir);
+        crawlFinished.store(true);
+
+        if (crawlFinished.load() && scannedCount.load() == totalCount.load()) {
+            statusCode.store(2);
+        }
     }
 })
 {
-    for (int i = 0; i != finder::scan_threads_count; i++)
+    for (int i = 0; i != Finder::scanThreadsCount; i++)
     {
-        scan_threads.emplace_back([this, i]
+        scanThreads.emplace_back([this, i]
         {
             for (;;)
             {
-                std::unique_lock<std::mutex> queue_lg(queue_m);
-                scanner_has_work_cv.wait(queue_lg, [this]
+                std::unique_lock<std::mutex> queueLg(queueM);
+                scannerHasWorkCv.wait(queueLg, [this]
                 {
-                    return !file_queue.empty() || quit;
+                    return !fileQueue.empty() || quit;
                 });
 
-                if (quit)
+                if (quit) {
                     return;
-
-                QString file_path = file_queue.top();
-                QString text;
-                file_queue.pop();
-                scan_cancel[i].store(false);
-                queue_lg.unlock();
-
-                {
-                    std::lock_guard<std::mutex> params_lg(params_m);
-                    text = params.text_to_search;
                 }
 
-                scan(file_path, text, scan_cancel[i]);
+                QString filePath = fileQueue.top();
+                QString pattern = queuedPattern;
+                fileQueue.pop();
+                scanCancel[i].store(false);
+                queueLg.unlock();
+
+                scan(filePath, pattern, scanCancel[i]);
+
+                if (crawlFinished.load() && scannedCount.load() == totalCount.load()) {
+                    statusCode.store(2);
+                }
             }
         });
     }
 }
 
-finder::~finder()
+Finder::~Finder()
 {
     cancel.store(true);
     {
-        std::lock_guard<std::mutex> params_lg(params_m);
+        std::lock_guard<std::mutex> paramsLg(paramsM);
         quit = true;
-        crawler_has_work_cv.notify_all();
-        scanner_has_work_cv.notify_all();
+        crawlerHasWorkCv.notify_all();
+        scannerHasWorkCv.notify_all();
     }
-    crawl_thread.join();
-    for (size_t i = 0; i != scan_threads.size(); i++)
+    crawlThread.join();
+    for (size_t i = 0; i != scanThreads.size(); i++)
     {
-        scan_threads[i].join();
+        scanThreads[i].join();
     }
 }
 
-void finder::set_directory(QString directory)
+void Finder::setDirectory(const QString &directory)
 {
-    std::lock_guard<std::mutex> params_lg(params_m);
+    std::lock_guard<std::mutex> paramsLg(paramsM);
     params.done = false;
     params.directory = directory;
-    params.invalid = params.directory.isEmpty() || params.text_to_search.isEmpty();
+    params.invalid = params.directory.isEmpty() || params.pattern.isEmpty();
 
     cancel.store(true);
-    crawler_has_work_cv.notify_all();
+    crawlerHasWorkCv.notify_all();
 }
 
-void finder::set_text_to_search(QString text)
+void Finder::setPattern(const QString &pattern)
 {
-    std::lock_guard<std::mutex> params_lg(params_m);
+    std::lock_guard<std::mutex> paramsLg(paramsM);
     params.done = false;
-    params.text_to_search = text;
-    params.invalid = params.directory.isEmpty() || params.text_to_search.isEmpty();
+    params.pattern = pattern;
+    params.invalid = params.directory.isEmpty() || params.pattern.isEmpty();
 
     cancel.store(true);
-    crawler_has_work_cv.notify_all();
+    crawlerHasWorkCv.notify_all();
 }
 
-void finder::stop() {
-    std::lock_guard<std::mutex> lg(queue_m);
+void Finder::stop() {
+    std::lock_guard<std::mutex> queueLg(queueM);
 
+    statusCode.store(3);
     cancel.store(true);
-    for (size_t i = 0; i < scan_cancel.size(); i++) {
-        scan_cancel[i].store(true);
+    for (size_t i = 0; i < scanCancel.size(); i++) {
+        scanCancel[i].store(true);
     }
 
-    file_queue = decltype(file_queue)();
+    fileQueue = FileQueue();
 }
 
-void finder::crawl(QString directory)
+void Finder::crawl(const QString &directory)
 {
-    QDirIterator dir_it(directory,
-                        QDir::Dirs | QDir::NoSymLinks | QDir::NoDotAndDotDot | QDir::Hidden,
-                        QDirIterator::Subdirectories);
+    QDirIterator dirIt(directory,
+                       QDir::Dirs | QDir::NoSymLinks | QDir::NoDotAndDotDot | QDir::Hidden,
+                       QDirIterator::Subdirectories);
 
     QDir current(directory);
 
-    do
-    {
-        if (cancel.load())
+    do {
+        if (cancel.load()) {
             return;
+        }
 
         current.setFilter(QDir::Files | QDir::Hidden | QDir::NoSymLinks);
 
         auto files = current.entryInfoList();
 
-        for (auto file : files)
-        {
-            if (cancel.load())
+        for (auto file : files) {
+            if (cancel.load()) {
                 return;
+            }
 
-            if (!file.permission(QFile::ReadUser))
+            if (!file.permission(QFile::ReadUser)) {
                 continue;
+            }
 
-            enque_file_to_scan(file.absoluteFilePath());
-            total_size += file.size();
+            enqueFileToScan(file.absoluteFilePath());
         }
-
-        queue_callback();
-    }
-    while (dir_it.hasNext() && (current = QDir(dir_it.next())).exists());
+    } while (dirIt.hasNext() && (current = QDir(dirIt.next())).exists());
 }
 
-void finder::scan(QString file_path, QString text, std::atomic<bool> &cancel)
+void Finder::enqueFileToScan(const QString &filePath)
 {
-    QFile file_obj(file_path);
-    if (!file_obj.open(QIODevice::ReadOnly | QIODevice::Text))
+    std::lock_guard<std::mutex> queueLg(queueM);
+
+    totalCount++;
+    totalSize += QFile(filePath).size();
+
+    fileQueue.push(filePath);
+    scannerHasWorkCv.notify_one();
+}
+
+
+void Finder::scan(const QString &filePath, const QString &pattern, std::atomic<bool> &cancel)
+{
+    QFile fileObj(filePath);
+    if (!fileObj.open(QIODevice::ReadOnly | QIODevice::Text))
         return;
 
-    QTextStream in(&file_obj);
+    QTextStream in(&fileObj);
     QString block;
 
-    while (!in.atEnd())
-    {
-        if (cancel.load())
+    while (!in.atEnd()) {
+        if (cancel.load() || maxEntryListSize <= entryCount) {
             break;
+        }
 
         QString buffer = std::move(block);
-        block = in.read(finder::reading_block_size);
+        block = in.read(Finder::readingBlockSize);
         buffer.append(block);
-        if (buffer.contains(text))
-        {
-            std::lock_guard<std::mutex> result_lg(result_m);
-            if (cancel.load())
+        if (buffer.contains(pattern)) {
+            std::lock_guard<std::mutex> resultLg(resultM);
+            if (cancel.load() || maxEntryListSize <= entryCount) {
                 break;
+            }
 
-            result.items.push_back(file_path);
-            queue_callback();
-            break;
+            entryCount++;
+            result.list.push_back({filePath, "before", pattern, "after", 0, 0});
         }
     }
 
-    scanned_size += QFile(file_path).size();
-    queue_callback();
+    if (cancel.load()) {
+        return;
+    }
+
+    scannedCount++;
+    scannedSize += QFile(filePath).size();
+
+    if (maxEntryListSize <= entryCount.load()) {
+        statusCode.store(4);
+    }
 }
 
-finder::result_t finder::get_result()
+Finder::EntryList Finder::getResult()
 {
-    std::lock_guard<std::mutex> result_lg(result_m);
+    std::unique_lock<std::mutex> resultLg(resultM, std::try_to_lock);
+    if (!resultLg.owns_lock()) {
+        EntryList tmp;
+        tmp.first = false;
+        return tmp;
+    }
 
-    unsigned long long all_cnt = total_size.load();
-    unsigned long long done_cnt = scanned_size.load();
-
-    result_t tmp = result;
+    EntryList tmp(std::move(result));
     result.first = false;
-    result.items.clear();
-    tmp.progress = all_cnt == 0 ? 0 : done_cnt *100 / all_cnt;
+    result.list.clear();
     return tmp;
 }
 
-void finder::enque_file_to_scan(QString file_path)
+int Finder::getStatus() const
 {
-    std::lock_guard<std::mutex> queue_lg(queue_m);
-    file_queue.push(file_path);
-    scanner_has_work_cv.notify_one();
+    return statusCode.load();
 }
 
-void finder::queue_callback()
+Finder::Metrics Finder::getMetrics() const
 {
-    if (callback_queued.load())
-        return;
-
-    callback_queued.store(true);
-    QMetaObject::invokeMethod(this, "callback", Qt::QueuedConnection);
-}
-
-void finder::callback()
-{
-    callback_queued.store(false);
-
-    emit result_changed();
+    return {scannedCount.load(), scannedSize.load(), totalCount.load(), totalSize.load()};
 }
