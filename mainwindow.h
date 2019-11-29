@@ -1,10 +1,12 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
+#include <QtGui/qtextdocument.h>
 #include <QDir>
 #include <QFileDialog>
 #include <QMainWindow>
 #include <QTimer>
+
 
 #include "finder.h"
 #include "helpers.h"
@@ -39,10 +41,13 @@ private slots:
 private:
     static const int pollingInterval = 200;
     static const int statusAnimationInterval = 200;
+    static const int maxListSize = 100;
+
     Ui::MainWindow *ui;
     QTimer pollingTimer;
     QTimer statusAnimationTimer;
     Finder bgFinder;
+    size_t listSize;
 };
 
 #endif // MAINWINDOW_H

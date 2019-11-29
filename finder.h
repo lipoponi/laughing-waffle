@@ -87,7 +87,6 @@ public slots:
 private:
     static const int scanThreadsCount = 4;
     static const int readingBlockSize = 4096;
-    static const int maxEntryListSize = 1000;
 
     std::atomic<int> entryCount;
     std::atomic<int> statusCode;

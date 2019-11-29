@@ -71,7 +71,6 @@ Finder::Finder()
         paramsLg.unlock();
 
         crawl(dir);
-        crawlFinished.store(true);
 
         if (crawlFinished.load() && scannedCount.load() == totalCount.load()) {
             statusCode.store(2);
@@ -190,6 +189,8 @@ void Finder::crawl(const QString &directory)
             enqueFileToScan(file.absoluteFilePath());
         }
     } while (dirIt.hasNext() && (current = QDir(dirIt.next())).exists());
+
+    crawlFinished.store(true);
 }
 
 void Finder::enqueFileToScan(const QString &filePath)
@@ -214,41 +215,58 @@ void Finder::scan(const QString &filePath, const QString &pattern, std::atomic<b
 
     Automaton a = Automaton::fromString(pattern);
     std::deque<QChar> que;
+    std::deque<Entry> resultQueue;
 
     while (!in.atEnd()) {
-        if (cancel.load() || maxEntryListSize <= entryCount) {
+        if (cancel.load()) {
             break;
         }
 
         QString block(in.read(Finder::readingBlockSize));
         for (QChar &ch : block) {
-            if (cancel.load() || maxEntryListSize <= entryCount) {
+            if (cancel.load()) {
                 break;
             }
 
             que.push_back(ch);
             a.step(ch, true);
 
+            {
+                std::lock_guard<std::mutex> resultLg(resultM);
+                while (!resultQueue.empty() && (resultQueue.front().after.size() == Entry::maxAfterChars || isUnsupportedChar(ch) || isLineSeperator(ch))) {
+                    result.list.push_back(resultQueue.front());
+                    resultQueue.pop_front();
+                }
+            }
+
             if (isUnsupportedChar(ch) || isLineSeperator(ch)) {
                 que.clear();
                 continue;
             }
 
-            if (a.isTerminal()) {
-                std::lock_guard<std::mutex> resultLg(resultM);
-                entryCount++;
+            for (Entry &entry : resultQueue) {
+                entry.after.append(ch);
+            }
 
+            if (a.isTerminal()) {
                 QString before;
                 for (size_t i = 0; i < que.size() - pattern.size(); i++) {
                     before.append(que[i]);
                 }
-
-                result.list.push_back({filePath, before, pattern, "after"});
+                resultQueue.push_back({filePath, before, pattern, ""});
             }
 
             if (que.size() == Entry::maxBeforeSize + pattern.size()) {
                 que.pop_front();
             }
+        }
+    }
+
+    {
+        std::lock_guard<std::mutex> resultLg(resultM);
+        while (!resultQueue.empty()) {
+            result.list.push_back(resultQueue.front());
+            resultQueue.pop_front();
         }
     }
 
@@ -258,10 +276,6 @@ void Finder::scan(const QString &filePath, const QString &pattern, std::atomic<b
 
     scannedCount++;
     scannedSize += QFile(filePath).size();
-
-    if (maxEntryListSize <= entryCount.load()) {
-        statusCode.store(4);
-    }
 }
 
 Finder::EntryList Finder::getResult()

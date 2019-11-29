@@ -6,6 +6,7 @@ MainWindow::MainWindow(QWidget *parent)
     , ui(new Ui::MainWindow)
     , pollingTimer(this)
     , statusAnimationTimer(this)
+    , listSize(0)
 {
     ui->setupUi(this);
 
@@ -36,14 +37,23 @@ void MainWindow::updateList()
     auto result = bgFinder.getResult();
 
     if (result.first) {
-        ui->listWidget->clear();
+        ui->textBrowser->clear();
+        listSize = 0;
     }
 
-    QString format = "    %1%2%3";
+    QString file = "<font color=purple>%1</font>";
+    QString format = "%1<font color=blue><b>%2</b></font>%3";
 
     for (auto &item : result.list) {
-        ui->listWidget->addItem(item.filePath);
-        ui->listWidget->addItem(format.arg(item.before).arg(item.entry).arg(item.after));
+        if (maxListSize <= listSize) break;
+
+        listSize++;
+        ui->textBrowser->append(file.arg(item.filePath));
+        ui->textBrowser->append(format
+                                .arg(item.before.toHtmlEscaped())
+                                .arg(item.entry.toHtmlEscaped())
+                                .arg(item.after.toHtmlEscaped()));
+        ui->textBrowser->append("");
     }
 }
 
@@ -60,9 +70,6 @@ void MainWindow::updateStatus()
     case 3:
         setStatus("Stopped by user");
         break;
-    case 4:
-        setStatus("Too many matches");
-        break;
     default:
         setStatus("");
     }
@@ -71,11 +78,13 @@ void MainWindow::updateStatus()
 void MainWindow::updateMetrics()
 {
     auto metrics = bgFinder.getMetrics();
-    QString line = "Scanned: %1 | Total: %2 | Scanned size: %3 | Total size: %4";
-    line = line.arg(metrics.scannedCount).arg(metrics.totalCount);
-    line = line.arg(humanizeSize(metrics.scannedSize)).arg(humanizeSize(metrics.totalSize));
+    QString format = "Scanned: %1 (%2) | Found: %3 (%4)";
 
-    ui->label_metrics->setText(line);
+    ui->label_metrics->setText(format
+                               .arg(humanizeSize(metrics.scannedSize))
+                               .arg(metrics.scannedCount)
+                               .arg(humanizeSize(metrics.totalSize))
+                               .arg(metrics.totalCount));
 }
 
 void MainWindow::onDirectoryChange(const QString &value)
