@@ -211,24 +211,50 @@ void Finder::scan(const QString &filePath, const QString &pattern, std::atomic<b
         return;
 
     QTextStream in(&fileObj);
-    QString block;
+
+    Automaton a = Automaton::fromString(pattern);
+    std::deque<QChar> que;
+
+    int line_no = 1;
+    int position = 0;
 
     while (!in.atEnd()) {
         if (cancel.load() || maxEntryListSize <= entryCount) {
             break;
         }
 
-        QString buffer = std::move(block);
-        block = in.read(Finder::readingBlockSize);
-        buffer.append(block);
-        if (buffer.contains(pattern)) {
-            std::lock_guard<std::mutex> resultLg(resultM);
-            if (cancel.load() || maxEntryListSize <= entryCount) {
-                break;
+        QString block = in.read(Finder::readingBlockSize);
+        for (QChar &ch : block) {
+            position++;
+            a.step(ch, true);
+            que.push_back(ch);
+
+            if (ch == '\n') {
+                line_no++;
+                position = 0;
+                que.clear();
+                continue;
             }
 
-            entryCount++;
-            result.list.push_back({filePath, "before", pattern, "after", 0, 0});
+            if (a.isTerminal()) {
+                std::lock_guard<std::mutex> resultLg(resultM);
+                if (cancel.load() || maxEntryListSize <= entryCount) {
+                    break;
+                }
+
+                entryCount++;
+                QString before;
+                for (QChar &c : que) {
+                    if (before.size() == que.size() - pattern.size()) break;
+                    before.append(c);
+                }
+
+                result.list.push_back({filePath, before, pattern, "after", line_no, position - pattern.size() + 1});
+            }
+
+            if (que.size() == 8 + pattern.size()) {
+                que.pop_front();
+            }
         }
     }
 

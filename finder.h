@@ -4,6 +4,7 @@
 #include <array>
 #include <atomic>
 #include <condition_variable>
+#include <deque>
 #include <mutex>
 #include <queue>
 #include <thread>
@@ -14,6 +15,9 @@
 #include <QObject>
 #include <QTextStream>
 #include <QThread>
+#include <QStringBuilder>
+
+#include "automaton.h"
 
 class Finder : public QObject
 {
