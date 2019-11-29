@@ -14,10 +14,9 @@
 #include <QFile>
 #include <QObject>
 #include <QTextStream>
-#include <QThread>
-#include <QStringBuilder>
 
 #include "automaton.h"
+#include "helpers.h"
 
 class Finder : public QObject
 {
@@ -25,12 +24,13 @@ class Finder : public QObject
 public:
     struct Entry
     {
+        static const size_t maxBeforeSize = 16;
+        static const size_t maxAfterChars = 16;
+
         QString filePath;
         QString before;
         QString entry;
         QString after;
-        uint64_t position;
-        uint64_t line;
     };
 
     struct EntryList
@@ -87,7 +87,7 @@ public slots:
 private:
     static const int scanThreadsCount = 4;
     static const int readingBlockSize = 4096;
-    static const int maxEntryListSize = 100;
+    static const int maxEntryListSize = 1000;
 
     std::atomic<int> entryCount;
     std::atomic<int> statusCode;

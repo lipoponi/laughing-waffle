@@ -1,8 +1,8 @@
 #ifndef AUTOMATON_H
 #define AUTOMATON_H
 
-#include <vector>
 #include <map>
+#include <vector>
 #include <QChar>
 #include <QString>
 

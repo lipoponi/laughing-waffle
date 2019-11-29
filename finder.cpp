@@ -18,11 +18,11 @@ Finder::Finder()
     : QObject(nullptr)
     , entryCount(0)
     , statusCode(0)
+    , crawlFinished(false)
     , scannedCount(0)
     , scannedSize(0)
     , totalCount(0)
     , totalSize(0)
-    , crawlFinished(false)
     , quit(false)
     , cancel(false)
     , crawlThread([this]
@@ -207,52 +207,46 @@ void Finder::enqueFileToScan(const QString &filePath)
 void Finder::scan(const QString &filePath, const QString &pattern, std::atomic<bool> &cancel)
 {
     QFile fileObj(filePath);
-    if (!fileObj.open(QIODevice::ReadOnly | QIODevice::Text))
+    if (!fileObj.open(QIODevice::ReadOnly | QIODevice::Text)) {
         return;
-
+    }
     QTextStream in(&fileObj);
 
     Automaton a = Automaton::fromString(pattern);
     std::deque<QChar> que;
-
-    int line_no = 1;
-    int position = 0;
 
     while (!in.atEnd()) {
         if (cancel.load() || maxEntryListSize <= entryCount) {
             break;
         }
 
-        QString block = in.read(Finder::readingBlockSize);
+        QString block(in.read(Finder::readingBlockSize));
         for (QChar &ch : block) {
-            position++;
-            a.step(ch, true);
-            que.push_back(ch);
+            if (cancel.load() || maxEntryListSize <= entryCount) {
+                break;
+            }
 
-            if (ch == '\n') {
-                line_no++;
-                position = 0;
+            que.push_back(ch);
+            a.step(ch, true);
+
+            if (isUnsupportedChar(ch) || isLineSeperator(ch)) {
                 que.clear();
                 continue;
             }
 
             if (a.isTerminal()) {
                 std::lock_guard<std::mutex> resultLg(resultM);
-                if (cancel.load() || maxEntryListSize <= entryCount) {
-                    break;
-                }
-
                 entryCount++;
+
                 QString before;
-                for (QChar &c : que) {
-                    if (before.size() == que.size() - pattern.size()) break;
-                    before.append(c);
+                for (size_t i = 0; i < que.size() - pattern.size(); i++) {
+                    before.append(que[i]);
                 }
 
-                result.list.push_back({filePath, before, pattern, "after", line_no, position - pattern.size() + 1});
+                result.list.push_back({filePath, before, pattern, "after"});
             }
 
-            if (que.size() == 8 + pattern.size()) {
+            if (que.size() == Entry::maxBeforeSize + pattern.size()) {
                 que.pop_front();
             }
         }

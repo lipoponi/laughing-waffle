@@ -15,3 +15,13 @@ QString humanizeSize(uint64_t size)
 
     return QString().setNum(num, 'f', 1) + unit;
 }
+
+bool isUnsupportedChar(const QChar &c)
+{
+    return !c.isPrint() || c.isNonCharacter();
+}
+
+bool isLineSeperator(const QChar &c)
+{
+    return c.category() == QChar::Separator_Line || c.category() == QChar::Separator_Paragraph;
+}

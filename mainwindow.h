@@ -5,7 +5,6 @@
 #include <QFileDialog>
 #include <QMainWindow>
 #include <QTimer>
-#include <QLocale>
 
 #include "finder.h"
 #include "helpers.h"
@@ -17,6 +16,10 @@ class MainWindow;
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
+private:
+    void updateList();
+    void updateStatus();
+    void updateMetrics();
 
 public:
     explicit MainWindow(QWidget *parent = 0);

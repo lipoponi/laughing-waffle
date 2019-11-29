@@ -31,6 +31,53 @@ MainWindow::~MainWindow()
     delete ui;
 }
 
+void MainWindow::updateList()
+{
+    auto result = bgFinder.getResult();
+
+    if (result.first) {
+        ui->listWidget->clear();
+    }
+
+    QString format = "    %1%2%3";
+
+    for (auto &item : result.list) {
+        ui->listWidget->addItem(item.filePath);
+        ui->listWidget->addItem(format.arg(item.before).arg(item.entry).arg(item.after));
+    }
+}
+
+void MainWindow::updateStatus()
+{
+    auto status = bgFinder.getStatus();
+    switch (status) {
+    case 1:
+        statusAnimationTimer.start(0);
+        break;
+    case 2:
+        setStatus("Finished");
+        break;
+    case 3:
+        setStatus("Stopped by user");
+        break;
+    case 4:
+        setStatus("Too many matches");
+        break;
+    default:
+        setStatus("");
+    }
+}
+
+void MainWindow::updateMetrics()
+{
+    auto metrics = bgFinder.getMetrics();
+    QString line = "Scanned: %1 | Total: %2 | Scanned size: %3 | Total size: %4";
+    line = line.arg(metrics.scannedCount).arg(metrics.totalCount);
+    line = line.arg(humanizeSize(metrics.scannedSize)).arg(humanizeSize(metrics.totalSize));
+
+    ui->label_metrics->setText(line);
+}
+
 void MainWindow::onDirectoryChange(const QString &value)
 {
     bool exists = QDir(value).exists();
@@ -69,44 +116,9 @@ void MainWindow::onStopClick()
 
 void MainWindow::onPollingTimeout()
 {
-    auto result = bgFinder.getResult();
-
-    if (result.first) {
-        ui->listWidget->clear();
-    }
-
-    QString fileLine = "%1:%2:%3";
-    QString chunkLine = "    %1%2%3";
-
-    for (auto &item : result.list) {
-        ui->listWidget->addItem(fileLine.arg(item.filePath).arg(item.line).arg(item.position));
-        ui->listWidget->addItem(chunkLine.arg(item.before).arg(item.entry).arg(item.after));
-    }
-
-    auto status = bgFinder.getStatus();
-    switch (status) {
-    case 1:
-        statusAnimationTimer.start(0);
-        break;
-    case 2:
-        setStatus("Finished");
-        break;
-    case 3:
-        setStatus("Stopped by user");
-        break;
-    case 4:
-        setStatus("Too many matches");
-        break;
-    default:
-        setStatus("");
-    }
-
-    auto metrics = bgFinder.getMetrics();
-    QString line = "Scanned: %1 | Total: %2 | Scanned size: %3 | Total size: %4";
-    line = line.arg(metrics.scannedCount).arg(metrics.totalCount);
-    line = line.arg(humanizeSize(metrics.scannedSize)).arg(humanizeSize(metrics.totalSize));
-
-    ui->label_metrics->setText(line);
+    updateList();
+    updateStatus();
+    updateMetrics();
 }
 
 void MainWindow::onStatusAnimationTimeout()
