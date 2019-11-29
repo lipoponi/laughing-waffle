@@ -27,6 +27,7 @@ public:
         static const size_t maxBeforeSize = 16;
         static const size_t maxAfterChars = 16;
 
+        uint64_t line;
         QString filePath;
         QString before;
         QString entry;

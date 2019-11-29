@@ -15,6 +15,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->pushButton_browse, &QPushButton::clicked, this, &MainWindow::onBrowseClick);
     connect(ui->pushButton_restart, &QPushButton::clicked, this, &MainWindow::onRestartClick);
     connect(ui->pushButton_stop, &QPushButton::clicked, this, &MainWindow::onStopClick);
+    connect(ui->pushButton_saveResults, &QPushButton::clicked, this, &MainWindow::saveResults);
     connect(&pollingTimer, &QTimer::timeout, this, &MainWindow::onPollingTimeout);
     connect(&statusAnimationTimer, &QTimer::timeout, this, &MainWindow::onStatusAnimationTimeout);
 
@@ -38,18 +39,21 @@ void MainWindow::updateList()
 
     if (result.first) {
         ui->textBrowser->clear();
+        store.clear();
         listSize = 0;
     }
 
-    QString file = "<font color=purple>%1</font>";
-    QString format = "%1<font color=blue><b>%2</b></font>%3";
+    QString fileFormat = "<font color=purple>%1</font>:%2";
+    QString fragmentFormat = "%1<font color=blue><b>%2</b></font>%3";
 
     for (auto &item : result.list) {
-        if (maxListSize <= listSize) break;
+        store[item.filePath].push_back(item);
+
+        if (maxListSize <= listSize) continue;
 
         listSize++;
-        ui->textBrowser->append(file.arg(item.filePath));
-        ui->textBrowser->append(format
+        ui->textBrowser->append(fileFormat.arg(item.filePath).arg(item.line));
+        ui->textBrowser->append(fragmentFormat
                                 .arg(item.before.toHtmlEscaped())
                                 .arg(item.entry.toHtmlEscaped())
                                 .arg(item.after.toHtmlEscaped()));
@@ -85,6 +89,37 @@ void MainWindow::updateMetrics()
                                .arg(metrics.scannedCount)
                                .arg(humanizeSize(metrics.totalSize))
                                .arg(metrics.totalCount));
+}
+
+void MainWindow::saveResults()
+{
+    QString filePath = QFileDialog::getSaveFileName(this, "Select Destination", QDir::homePath());
+
+    QFile file(filePath);
+    if (!file.open(QIODevice::WriteOnly)) {
+        QMessageBox::information(this, "Save Results", "Unsuccessfully");
+        return;
+    }
+    QTextStream fstream(&file);
+
+    QString fileFormat = "<font color=purple>%1</font>";
+    QString fragmentFormat = "<font color=gray>%1</font>:\t%2<font color=blue><b>%3</b></font>%4";
+
+    fstream << "<pre>";
+    for (auto &filePair : store) {
+        fstream << fileFormat.arg(filePair.first) << endl;
+        for (Finder::Entry &item : filePair.second) {
+            fstream << fragmentFormat
+                       .arg(item.line)
+                       .arg(item.before.toHtmlEscaped())
+                       .arg(item.entry.toHtmlEscaped())
+                       .arg(item.after.toHtmlEscaped()) << endl;
+        }
+        fstream << endl;
+    }
+    fstream << "</pre>";
+
+    QMessageBox::information(this, "Save Results", "Success");
 }
 
 void MainWindow::onDirectoryChange(const QString &value)

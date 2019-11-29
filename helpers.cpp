@@ -23,5 +23,5 @@ bool isUnsupportedChar(const QChar &c)
 
 bool isLineSeperator(const QChar &c)
 {
-    return c.category() == QChar::Separator_Line || c.category() == QChar::Separator_Paragraph;
+    return c == '\n';
 }

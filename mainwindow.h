@@ -1,12 +1,13 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
+#include <map>
 #include <QtGui/qtextdocument.h>
 #include <QDir>
 #include <QFileDialog>
 #include <QMainWindow>
+#include <QMessageBox>
 #include <QTimer>
-
 
 #include "finder.h"
 #include "helpers.h"
@@ -22,6 +23,7 @@ private:
     void updateList();
     void updateStatus();
     void updateMetrics();
+    void saveResults();
 
 public:
     explicit MainWindow(QWidget *parent = 0);
@@ -48,6 +50,7 @@ private:
     QTimer statusAnimationTimer;
     Finder bgFinder;
     size_t listSize;
+    std::map<QString, std::vector<Finder::Entry>> store;
 };
 
 #endif // MAINWINDOW_H

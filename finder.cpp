@@ -217,6 +217,8 @@ void Finder::scan(const QString &filePath, const QString &pattern, std::atomic<b
     std::deque<QChar> que;
     std::deque<Entry> resultQueue;
 
+    uint64_t lineNo = 1;
+
     while (!in.atEnd()) {
         if (cancel.load()) {
             break;
@@ -239,6 +241,10 @@ void Finder::scan(const QString &filePath, const QString &pattern, std::atomic<b
                 }
             }
 
+            if (isLineSeperator(ch)) {
+                lineNo++;
+            }
+
             if (isUnsupportedChar(ch) || isLineSeperator(ch)) {
                 que.clear();
                 continue;
@@ -253,7 +259,7 @@ void Finder::scan(const QString &filePath, const QString &pattern, std::atomic<b
                 for (size_t i = 0; i < que.size() - pattern.size(); i++) {
                     before.append(que[i]);
                 }
-                resultQueue.push_back({filePath, before, pattern, ""});
+                resultQueue.push_back({lineNo, filePath, before, pattern, ""});
             }
 
             if (que.size() == Entry::maxBeforeSize + pattern.size()) {
