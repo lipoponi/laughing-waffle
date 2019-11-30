@@ -74,6 +74,7 @@ public:
     EntryList getResult();
     int getStatus() const;
     Metrics getMetrics() const;
+    bool isCrawlingFinished() const;
 
 private:
     void crawl(const QString &directory);

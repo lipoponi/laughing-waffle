@@ -308,3 +308,8 @@ Finder::Metrics Finder::getMetrics() const
 {
     return {scannedCount.load(), scannedSize.load(), totalCount.load(), totalSize.load()};
 }
+
+bool Finder::isCrawlingFinished() const
+{
+    return crawlFinished.load();
+}

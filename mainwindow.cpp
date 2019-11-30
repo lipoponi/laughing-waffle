@@ -83,7 +83,12 @@ void MainWindow::updateStatus()
 void MainWindow::updateMetrics()
 {
     auto metrics = bgFinder.getMetrics();
-    QString format = "Scanned: %1 (%2) | Found: %3 (%4)";
+    QString color = "black";
+    if (bgFinder.isCrawlingFinished()) {
+        color = "green";
+    }
+
+    QString format = "Scanned: %1 (%2) | Found: <font color=" + color + ">%3 (%4)</font>";
 
     ui->label_metrics->setText(format
                                .arg(humanizeSize(metrics.scannedSize))
