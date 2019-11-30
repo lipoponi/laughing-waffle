@@ -5,6 +5,7 @@
 #include <QtGui/qtextdocument.h>
 #include <QDir>
 #include <QFileDialog>
+#include <QHash>
 #include <QMainWindow>
 #include <QMessageBox>
 #include <QTimer>
@@ -50,7 +51,7 @@ private:
     QTimer statusAnimationTimer;
     Finder bgFinder;
     size_t listSize;
-    std::map<QString, std::vector<Finder::Entry>> store;
+    QHash<QString, std::vector<Finder::Entry>> store;
 };
 
 #endif // MAINWINDOW_H

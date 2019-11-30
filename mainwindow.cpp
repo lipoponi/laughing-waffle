@@ -112,9 +112,9 @@ void MainWindow::saveResults()
     QString fragmentFormat = "<font color=gray>%1</font>:\t%2<font color=blue><b>%3</b></font>%4";
 
     fstream << "<pre>";
-    for (auto &filePair : store) {
-        fstream << fileFormat.arg(filePair.first) << endl;
-        for (Finder::Entry &item : filePair.second) {
+    for (auto &filePath : store.keys()) {
+        fstream << fileFormat.arg(filePath) << endl;
+        for (Finder::Entry &item : store[filePath]) {
             fstream << fragmentFormat
                        .arg(item.line)
                        .arg(item.before.toHtmlEscaped())
