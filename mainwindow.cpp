@@ -23,6 +23,7 @@ MainWindow::MainWindow(QWidget *parent)
     ui->statusBar->addPermanentWidget(ui->label_metrics);
 
     ui->lineEdit_directory->setText(QDir::homePath());
+    ui->label_forList->setText(QString("First %1 entries:").arg(maxListSize));
 
     statusAnimationTimer.setSingleShot(true);
     pollingTimer.start(pollingInterval);

@@ -80,6 +80,13 @@
      </widget>
     </item>
     <item>
+     <widget class="QLabel" name="label_forList">
+      <property name="text">
+       <string>First %1 entries:</string>
+      </property>
+     </widget>
+    </item>
+    <item>
      <widget class="QTextBrowser" name="textBrowser">
       <property name="font">
        <font>
