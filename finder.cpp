@@ -55,6 +55,7 @@ Finder::Finder()
 
         params.done = true;
         if (params.invalid) {
+            statusCode.store(0);
             continue;
         }
 

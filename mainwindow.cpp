@@ -66,6 +66,9 @@ void MainWindow::updateStatus()
 {
     auto status = bgFinder.getStatus();
     switch (status) {
+    case 0:
+        setStatus("IDLE");
+        break;
     case 1:
         statusAnimationTimer.start(0);
         break;
@@ -184,7 +187,9 @@ void MainWindow::setStatus(const QString &status)
     QString color = "black";
     statusAnimationTimer.stop();
 
-    if (status.startsWith("Working")) {
+    if (status == "IDLE") {
+        color = "blue";
+    } else if (status.startsWith("Working")) {
         color = "orange";
         statusAnimationTimer.start(statusAnimationInterval);
     } else if (status == "Finished") {
