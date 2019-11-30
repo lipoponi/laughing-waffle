@@ -38,7 +38,11 @@
        </widget>
       </item>
       <item row="1" column="0" colspan="5">
-       <widget class="QLineEdit" name="lineEdit_pattern"/>
+       <widget class="QLineEdit" name="lineEdit_pattern">
+        <property name="placeholderText">
+         <string>Pattern</string>
+        </property>
+       </widget>
       </item>
       <item row="2" column="2">
        <spacer name="horizontalSpacer">
@@ -68,12 +72,16 @@
        </widget>
       </item>
       <item row="0" column="0" colspan="4">
-       <widget class="QLineEdit" name="lineEdit_directory"/>
+       <widget class="QLineEdit" name="lineEdit_directory">
+        <property name="placeholderText">
+         <string>Directory</string>
+        </property>
+       </widget>
       </item>
      </layout>
     </item>
     <item>
-     <widget class="Line" name="line">
+     <widget class="Line" name="line_separator">
       <property name="orientation">
        <enum>Qt::Horizontal</enum>
       </property>
@@ -87,7 +95,7 @@
      </widget>
     </item>
     <item>
-     <widget class="QTextBrowser" name="textBrowser">
+     <widget class="QTextBrowser" name="textBrowser_result">
       <property name="font">
        <font>
         <family>Ubuntu Mono</family>

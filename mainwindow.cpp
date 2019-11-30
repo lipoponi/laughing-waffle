@@ -39,7 +39,7 @@ void MainWindow::updateList()
     auto result = bgFinder.getResult();
 
     if (result.first) {
-        ui->textBrowser->clear();
+        ui->textBrowser_result->clear();
         store.clear();
         listSize = 0;
     }
@@ -53,12 +53,12 @@ void MainWindow::updateList()
         if (maxListSize <= listSize) continue;
 
         listSize++;
-        ui->textBrowser->append(fileFormat.arg(item.filePath).arg(item.line));
-        ui->textBrowser->append(fragmentFormat
+        ui->textBrowser_result->append(fileFormat.arg(item.filePath).arg(item.line));
+        ui->textBrowser_result->append(fragmentFormat
                                 .arg(item.before.toHtmlEscaped())
                                 .arg(item.entry.toHtmlEscaped())
                                 .arg(item.after.toHtmlEscaped()));
-        ui->textBrowser->append("");
+        ui->textBrowser_result->append("");
     }
 }
 
